@@ -1,0 +1,1285 @@
+{
+  "info": {
+    "_postman_id": "64b2f9ea-4b1b-4338-8580-fec39563fc8d",
+    "name": "Ester API",
+    "description": "Ester wellness app backend — daily Mind/Body/Check reflection, AI Coach, Journal & Today's Win, Insights (Discover/Patterns/Prediction), Goals, and the Home dashboard. Auth/User/Notifications are unchanged from the prior backend version.\n\nSet {{base_url}} and run Auth > Login first (its test script auto-saves {{accessToken}}); every other request inherits Bearer auth from the collection.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:5000/api/v1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ester Demo\",\n  \"email\": \"ester.demo@example.com\",\n  \"password\": \"Password@123\",\n  \"confirmPassword\": \"Password@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Response embeds the full user document under data.user, plus data.accessToken/refreshToken/role/_id. If OTP verification is pending, responds 403 with data.email instead of tokens.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ester.demo@example.com\",\n  \"password\": \"Password@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json().data;",
+                  "  if (data?.accessToken) pm.environment.set('accessToken', data.accessToken);",
+                  "  if (data?.refreshToken) pm.environment.set('refreshToken', data.refreshToken);",
+                  "  if (data?._id) pm.environment.set('userId', data._id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Email (OTP)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "verify"
+              ]
+            },
+            "description": "POST /auth/verify-email is an identical duplicate route -> same controller.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ester.demo@example.com\",\n  \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Forget Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/forget",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "forget"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ester.demo@example.com\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify OTP For Reset",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/verify-otp",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "verify-otp"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ester.demo@example.com\",\n  \"otp\": \"123456\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/reset-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ester.demo@example.com\",\n  \"otp\": \"123456\",\n  \"password\": \"NewPassword@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"Password@123\",\n  \"newPassword\": \"NewPassword@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/refresh-token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh-token"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Unchanged from the previous backend — included here only so the whole API surface lives in one collection."
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Get Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/user/profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "user",
+                "profile"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/user/update-profile",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "user",
+                "update-profile"
+              ]
+            },
+            "description": "multipart/form-data (multer) — avatar is an optional file field.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "name",
+                  "value": "Ester Demo",
+                  "type": "text"
+                },
+                {
+                  "key": "dob",
+                  "value": "1998-04-12",
+                  "type": "text"
+                },
+                {
+                  "key": "avatar",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit Feedback",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/user/feedback",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "user",
+                "feedback"
+              ]
+            },
+            "description": "multipart/form-data (multer) — attachment is an optional file field.",
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "subject",
+                  "value": "Love the new design",
+                  "type": "text"
+                },
+                {
+                  "key": "message",
+                  "value": "The new Mind/Body/Check flow feels great!",
+                  "type": "text"
+                },
+                {
+                  "key": "attachment",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "user",
+                "change-password"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"Password@123\",\n  \"newPassword\": \"NewPassword@123\",\n  \"confirmPassword\": \"NewPassword@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/user/delete-account",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "user",
+                "delete-account"
+              ]
+            },
+            "description": "Body IS required on this DELETE (unusual, but confirmed from the controller) — cascades deletes across Mood, Notification, Journal, CoachMessage, and Goal.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"password\": \"Password@123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Create Notification",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Mood Tracker Reminder\",\n  \"body\": \"Hey, open the app and log your mood today!\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Unread Notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark Notification As Read",
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/notifications/{{notificationId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "{{notificationId}}"
+              ]
+            },
+            "description": "No request body — just marks the notification as read."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mood & Reflection (Mind / Body / Check)",
+      "item": [
+        {
+          "name": "1. Submit Mind Step",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mood/mind",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mood",
+                "mind"
+              ]
+            },
+            "description": "moodScore: 1=Terrible, 2=Poor, 3=Okay, 4=Good, 5=Amazing. energyLevel/calmLevel/focusLevel are 0-100 sliders. Upserts today's reflection doc.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"moodScore\": 4,\n  \"energyLevel\": 60,\n  \"calmLevel\": 80,\n  \"focusLevel\": 80,\n  \"contextTags\": [\n    \"Focused\",\n    \"Grateful\"\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1b. Get AI Context-Tag Suggestions",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mood/mind/suggest-tags",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mood",
+                "mind",
+                "suggest-tags"
+              ]
+            },
+            "description": "Powers the 'AI Suggestion' chip on the Mind step. Always returns tags from the fixed CONTEXT_TAGS list, never a hallucinated word.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"moodScore\": 4,\n  \"energyLevel\": 60,\n  \"calmLevel\": 80,\n  \"focusLevel\": 80\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2. Submit Body Step",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mood/body",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mood",
+                "body"
+              ]
+            },
+            "description": "Requires the Mind step to be completed first (400 otherwise). Computes Sleep/Stress/Energy quality badges.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"waterGlasses\": 6,\n  \"sleepHours\": 7.75,\n  \"walkMinutes\": 20,\n  \"thoughts\": \"Feeling steady today.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3. Get Check Step Summary",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/mood/check",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mood",
+                "check"
+              ]
+            },
+            "description": "Read-only recap + 3 'What if you...' predictions. Requires the Body step to be completed first."
+          },
+          "response": []
+        },
+        {
+          "name": "4. Complete Reflection",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/mood/complete",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mood",
+                "complete"
+              ]
+            },
+            "description": "Idempotent — safe to call again if the network drops after the first success.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"thoughts\": \"Feeling steady today.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Today's Mood + Flow State",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/mood/today",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mood",
+                "today"
+              ]
+            },
+            "description": "Returns today's doc plus a flow object telling the frontend exactly which step to show, and whether to show the Good Morning modal."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Weekly Logs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/mood/weekly",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mood",
+                "weekly"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Moods",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/mood/all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mood",
+                "all"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Mood Details By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/mood/details/{{moodId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mood",
+                "details",
+                "{{moodId}}"
+              ]
+            },
+            "description": "Includes an AI-generated motivational message for the mood's label."
+          },
+          "response": []
+        }
+      ],
+      "description": "The 3-step daily reflection wizard. One Mood document per user per day; each endpoint advances or reads that day's doc."
+    },
+    {
+      "name": "Journal & Today's Win",
+      "item": [
+        {
+          "name": "Get Win Categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/journal/win-categories",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "journal",
+                "win-categories"
+              ]
+            },
+            "description": "Static list of the 6 'Today's Win' category chips with icon keys, so the frontend never hardcodes them."
+          },
+          "response": []
+        },
+        {
+          "name": "Create Journal Entry (Freewrite)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/journal",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "journal"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"freewrite\",\n  \"title\": \"Amazing progress today\",\n  \"description\": \"Had a really productive day. Morning meditation helped me stay focused...\",\n  \"moodScore\": 4,\n  \"tags\": [\n    \"Productive\",\n    \"Grateful\"\n  ],\n  \"promptUsed\": \"What made you feel most grateful today?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Today's Win Entry",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/journal",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "journal"
+              ]
+            },
+            "description": "Screen 11 'Today's Win' is just POST /journal with type='win' and a winCategory from the list above.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"win\",\n  \"title\": \"I experienced some ups and downs today.\",\n  \"description\": \"Instead of ignoring them, I tried to acknowledge how I was feeling and responded with patience and kindness toward myself.\",\n  \"moodScore\": 3,\n  \"winCategory\": \"Kind to myself\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Journal List",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/journal?type=freewrite&page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "journal"
+              ],
+              "query": [
+                {
+                  "key": "type",
+                  "value": "freewrite",
+                  "disabled": true
+                },
+                {
+                  "key": "page",
+                  "value": "1",
+                  "disabled": false
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "disabled": false
+                }
+              ]
+            },
+            "description": "Returns Recent Entries + 3 date-seeded Recent Prompts in one call."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Journal Entry By ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/journal/{{journalId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "journal",
+                "{{journalId}}"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update Journal Entry",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/journal/{{journalId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "journal",
+                "{{journalId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Updated title\",\n  \"description\": \"Updated description text.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Journal Entry",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/journal/{{journalId}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "journal",
+                "{{journalId}}"
+              ]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Journal (free-write) and Today's Win share one model, differentiated by `type`."
+    },
+    {
+      "name": "AI Coach",
+      "item": [
+        {
+          "name": "Get Coach Chat History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/coach/messages?limit=50&before=",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "coach",
+                "messages"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50",
+                  "disabled": false
+                },
+                {
+                  "key": "before",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Send Message To Coach",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/coach/messages",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "coach",
+                "messages"
+              ]
+            },
+            "description": "Persists the user message, calls OpenAI with mood/journal context + recent chat history, persists + returns the coach reply. The coach reply may include quickReplies the frontend can render as tappable chips — tapping one re-POSTs its exact text.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"text\": \"I've been feeling pretty overwhelmed today.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Trigger Idle-Break Nudge",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/coach/nudge",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "coach",
+                "nudge"
+              ]
+            },
+            "description": "Call this when the frontend's own idle timer fires (e.g. 25 min inactive while foregrounded). Server throttles to one nudge per 2 hours and returns { skipped: true } instead of erroring if called too soon.",
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Insights",
+      "item": [
+        {
+          "name": "Get Discover Tab",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/insights/discover",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "insights",
+                "discover"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Patterns Tab",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/insights/patterns",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "insights",
+                "patterns"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Prediction Tab",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/insights/prediction",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "insights",
+                "prediction"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get What-If Predictions",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/insights/what-if",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "insights",
+                "what-if"
+              ]
+            },
+            "description": "Same slice embedded in the Check step (Screen 3) and in the Prediction tab (Screen 9), exposed standalone too."
+          },
+          "response": []
+        }
+      ],
+      "description": "All percentages/predictions here are computed deterministically from the user's own Mood history — never LLM-generated. Users with fewer than 5 completed reflections get clearly-labeled cold-start fallback data instead of an error."
+    },
+    {
+      "name": "Goals",
+      "item": [
+        {
+          "name": "Create / Replace Active Goal",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/goals",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "goals"
+              ]
+            },
+            "description": "metric is one of energyLevel | calmLevel | focusLevel. Deactivates any prior active goal.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"metric\": \"energyLevel\",\n  \"targetValue\": 80\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Goal History",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/goals",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "goals"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get Active Goal Forecast",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/goals/active",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "goals",
+                "active"
+              ]
+            },
+            "description": "Powers the 'Goal Forecast' card on the Prediction tab (progress % + ETA days)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Home Dashboard",
+      "item": [
+        {
+          "name": "Get Today's Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/home/today",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "home",
+                "today"
+              ]
+            },
+            "description": "Single composite call for the Today screen: greeting, mood summary, motivational quote, movement/hydration totals, AI insight sentence, and a goodMorningModal object (null once the Mind step is done for the day)."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
