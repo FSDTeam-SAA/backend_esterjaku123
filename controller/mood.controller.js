@@ -5,6 +5,7 @@ import AppError from "../errors/AppError.js";
 import sendResponse from "../utils/sendResponse.js";
 import catchAsync from "../utils/catchAsync.js";
 import { simulateWhatIf } from "../utils/insightEngine.js";
+import { buildRecommendationCard } from "../utils/recommendationCardEngine.js";
 import {
   MOOD_SCORES,
   CONTEXT_TAGS,
@@ -218,6 +219,11 @@ export const getCheck = catchAsync(async (req, res) => {
   }).sort({ date: 1 });
 
   const whatIf = simulateWhatIf(history, doc);
+  const recommendationCard = await buildRecommendationCard({
+    history,
+    currentDoc: doc,
+    whatIf,
+  });
 
   sendResponse(res, {
     statusCode: httpStatus.OK,
@@ -240,6 +246,7 @@ export const getCheck = catchAsync(async (req, res) => {
       },
       thoughts: doc.thoughts,
       whatIf,
+      recommendationCard,
       completed: Boolean(doc.completedAt),
     },
   });
