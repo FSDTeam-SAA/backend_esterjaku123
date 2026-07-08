@@ -50,6 +50,11 @@ public/uploads/
 # Docker
 docker-compose.override.yml
 
+# Environment variables (secrets — never commit)
+.env
+.env.*
+!.env.example
+
 # Misc
 *.pid
 *.seed
