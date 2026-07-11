@@ -11,46 +11,21 @@ export const MIN_ENTRIES_FOR_INSIGHTS = 5;
 export const COLD_START_FALLBACK = {
   energyFormula: [],
   prediction: {
-    predictedEnergy: 65,
-    confidence: "Low",
-    reasons: ["Not enough data yet — keep logging daily"],
+    predictedEnergy: 0,
+    confidence: "0%",
+    reasons: [],
     coldStart: true,
   },
   weekOutlook: {
-    series: [65, 65, 65, 65, 65, 65, 65],
-    days: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
-    insight: "Log a few more days to unlock weekly trends.",
+    series: [],
+    days: [],
+    insight: "",
     coldStart: true,
   },
   riskPattern: null,
-  recommended: [
-    {
-      label: "Log your mood daily this week",
-      predictedImpact: "Unlocks personalized insights",
-    },
-  ],
-  whatIf: [
-    {
-      label: "Sleep 8hr tonight",
-      metric: "energy",
-      predictedText: "+10%-15%",
-      coldStart: true,
-    },
-    {
-      label: "Walk for 20 minutes",
-      metric: "mood",
-      predictedText: "+10%",
-      coldStart: true,
-    },
-    {
-      label: "Drink 2 more glasses",
-      metric: "focus",
-      predictedText: "+8%",
-      coldStart: true,
-    },
-  ],
-  insightSentence:
-    "Keep logging your mood daily — we'll start surfacing personalized insights after a few more entries.",
+  recommended: [],
+  whatIf: [],
+  insightSentence: "",
 };
 
 const FIELD_ACCESSORS = {
@@ -234,10 +209,82 @@ export const getEnergyFormula = (docs) => {
       observedCount: result.observedCount,
       observedLabel: `Observed ${result.observedCount} times`,
       series,
+      source: "history",
     });
   });
 
   return results;
+};
+
+export const getCurrentSnapshotPatterns = (docs) => {
+  if (!Array.isArray(docs) || !docs.length) return [];
+  const sorted = [...docs].sort(
+    (a, b) => new Date(a.date) - new Date(b.date),
+  );
+  const latest = sorted[sorted.length - 1];
+  const snapshot = [];
+  const energySeries = sorted
+    .slice(-14)
+    .map((doc) => doc.energyLevel)
+    .filter((value) => typeof value === "number")
+    .map(Math.round);
+  const moodSeries = sorted
+    .slice(-14)
+    .map((doc) => moodScoreToPercent(doc.moodScore))
+    .filter((value) => typeof value === "number")
+    .map(Math.round);
+  const focusSeries = sorted
+    .slice(-14)
+    .map((doc) => doc.focusLevel)
+    .filter((value) => typeof value === "number")
+    .map(Math.round);
+
+  if (typeof latest.sleepHours === "number") {
+    const energy = Math.round(latest.energyLevel ?? 0);
+    snapshot.push({
+      key: "current_sleep",
+      label: `Sleep ${formatSelectedNumber(latest.sleepHours)} hr`,
+      metric: "energy",
+      liftPercent: 0,
+      observedCount: 1,
+      observedLabel: "Today's check-in",
+      impactText: `Energy ${energy}%`,
+      series: energySeries,
+      source: "current_checkin",
+    });
+  }
+
+  if (typeof latest.walkMinutes === "number") {
+    const mood = Math.round(moodScoreToPercent(latest.moodScore) ?? 0);
+    snapshot.push({
+      key: "current_movement",
+      label: `Movement ${latest.walkMinutes} min`,
+      metric: "mood",
+      liftPercent: 0,
+      observedCount: 1,
+      observedLabel: "Today's check-in",
+      impactText: `Mood ${mood}%`,
+      series: moodSeries,
+      source: "current_checkin",
+    });
+  }
+
+  if (typeof latest.waterGlasses === "number") {
+    const focus = Math.round(latest.focusLevel ?? 0);
+    snapshot.push({
+      key: "current_hydration",
+      label: `Hydration ${latest.waterGlasses} glasses`,
+      metric: "focus",
+      liftPercent: 0,
+      observedCount: 1,
+      observedLabel: "Today's check-in",
+      impactText: `Focus ${focus}%`,
+      series: focusSeries,
+      source: "current_checkin",
+    });
+  }
+
+  return snapshot;
 };
 
 export const getTopCorrelation = (energyFormula) => {
@@ -246,7 +293,7 @@ export const getTopCorrelation = (energyFormula) => {
 };
 
 export const getSleepVsEnergyChart = (docs) => {
-  if (!hasEnoughHistory(docs)) return null;
+  if (!Array.isArray(docs) || !docs.length) return null;
 
   const buckets = {};
   docs.forEach((d) => {
@@ -262,7 +309,15 @@ export const getSleepVsEnergyChart = (docs) => {
     .sort((a, b) => a - b)
     .map((hr) => ({ hour: hr, avgEnergy: Math.round(average(buckets[hr])) }));
 
-  if (chartPoints.length < 2) return null;
+  if (!chartPoints.length) return null;
+
+  if (chartPoints.length === 1) {
+    const point = chartPoints[0];
+    return {
+      points: chartPoints,
+      insight: `Latest check-in: ${point.hour} hr sleep with ${point.avgEnergy}% energy.`,
+    };
+  }
 
   const highest = chartPoints.reduce((a, b) => (b.avgEnergy > a.avgEnergy ? b : a));
   const lowest = chartPoints.reduce((a, b) => (b.avgEnergy < a.avgEnergy ? b : a));
@@ -283,7 +338,34 @@ const TREND_FIELDS = [
 ];
 
 export const getWeeklyTrends = (docs) => {
-  if (docs.length < 8) return null;
+  if (!Array.isArray(docs) || !docs.length) return null;
+
+  if (docs.length < 8) {
+    const sorted = [...docs].sort(
+      (a, b) => new Date(a.date) - new Date(b.date),
+    );
+    const latest = sorted[sorted.length - 1];
+    return {
+      sleep: {
+        direction: "Current",
+        percentChange: null,
+        valueText: `${formatSelectedNumber(latest.sleepHours ?? 0)} hr`,
+        source: "current_checkin",
+      },
+      hydration: {
+        direction: "Current",
+        percentChange: null,
+        valueText: `${latest.waterGlasses ?? 0} glasses`,
+        source: "current_checkin",
+      },
+      movement: {
+        direction: "Current",
+        percentChange: null,
+        valueText: `${latest.walkMinutes ?? 0} min`,
+        source: "current_checkin",
+      },
+    };
+  }
 
   const sorted = [...docs].sort((a, b) => new Date(a.date) - new Date(b.date));
   const lastDocs = sorted.slice(-14);
@@ -303,14 +385,67 @@ export const getWeeklyTrends = (docs) => {
       percentChange: Math.round(
         ((thisWeekAvg - lastWeekAvg) / Math.max(lastWeekAvg, 1)) * 100,
       ),
+      valueText: "",
+      source: "history",
     };
   });
 
   return Object.keys(trends).length ? trends : null;
 };
 
+const formatSelectedNumber = (value) =>
+  Number.isInteger(value) ? value.toString() : value.toFixed(1);
+
+const getCurrentCheckinScenarios = (currentDoc) => {
+  if (!currentDoc) return [];
+
+  const scenarios = [];
+  if (typeof currentDoc.sleepHours === "number") {
+    const selected = currentDoc.sleepHours;
+    const target = 7;
+    const remaining = Math.max(0, target - selected);
+    scenarios.push({
+      label: `Sleep ${target}hr`,
+      metric: "sleep",
+      predictedText:
+        remaining > 0
+          ? `You selected ${formatSelectedNumber(selected)} hr — ${formatSelectedNumber(remaining)} more hr reaches ${target} hr.`
+          : `You selected ${formatSelectedNumber(selected)} hr — the ${target} hr target is met.`,
+      source: "current_checkin",
+    });
+  }
+
+  if (typeof currentDoc.walkMinutes === "number") {
+    const selected = currentDoc.walkMinutes;
+    const target = 20;
+    const remaining = Math.max(0, target - selected);
+    scenarios.push({
+      label: `Walk ${target} minutes`,
+      metric: "movement",
+      predictedText:
+        remaining > 0
+          ? `You selected ${selected} min — ${remaining} more min reaches ${target} min.`
+          : `You selected ${selected} min — the ${target} min target is met.`,
+      source: "current_checkin",
+    });
+  }
+
+  if (typeof currentDoc.waterGlasses === "number") {
+    const selected = currentDoc.waterGlasses;
+    const scenario = Math.min(20, selected + 2);
+    scenarios.push({
+      label: "Drink 2 more glasses",
+      metric: "hydration",
+      predictedText: `You selected ${selected} glasses — this scenario totals ${scenario} glasses.`,
+      source: "current_checkin",
+    });
+  }
+
+  return scenarios;
+};
+
 export const simulateWhatIf = (docs, currentDoc) => {
-  if (!hasEnoughHistory(docs)) return COLD_START_FALLBACK.whatIf;
+  if (!hasEnoughHistory(docs)) return getCurrentCheckinScenarios(currentDoc);
 
   const suggestions = [];
 
@@ -322,9 +457,8 @@ export const simulateWhatIf = (docs, currentDoc) => {
       label: "Sleep 8hr tonight",
       metric: "energy",
       predictedText: `${low}%-${high}%`,
+      source: "history",
     });
-  } else {
-    suggestions.push(COLD_START_FALLBACK.whatIf[0]);
   }
 
   const walkResult = correlate(docs, "walkMinutes", "moodPercent", 20, "gte");
@@ -334,9 +468,8 @@ export const simulateWhatIf = (docs, currentDoc) => {
       label: "Walk for 20 minutes",
       metric: "mood",
       predictedText: `${sign}${walkResult.liftPercent}%`,
+      source: "history",
     });
-  } else {
-    suggestions.push(COLD_START_FALLBACK.whatIf[1]);
   }
 
   const currentWater =
@@ -354,12 +487,13 @@ export const simulateWhatIf = (docs, currentDoc) => {
       label: "Drink 2 more glasses",
       metric: "focus",
       predictedText: `${sign}${waterResult.liftPercent}%`,
+      source: "history",
     });
-  } else {
-    suggestions.push(COLD_START_FALLBACK.whatIf[2]);
   }
 
-  return suggestions;
+  return suggestions.length
+    ? suggestions
+    : getCurrentCheckinScenarios(currentDoc);
 };
 
 export const detectRiskPattern = (docs) => {
@@ -403,7 +537,32 @@ export const detectRiskPattern = (docs) => {
 };
 
 export const getTomorrowPrediction = (docs) => {
-  if (!hasEnoughHistory(docs)) return COLD_START_FALLBACK.prediction;
+  if (!Array.isArray(docs) || !docs.length) {
+    return COLD_START_FALLBACK.prediction;
+  }
+
+  if (!hasEnoughHistory(docs)) {
+    const sorted = [...docs].sort(
+      (a, b) => new Date(a.date) - new Date(b.date),
+    );
+    const latest = sorted[sorted.length - 1];
+    const reasons = [];
+    if (typeof latest.sleepHours === "number") {
+      reasons.push(`${formatSelectedNumber(latest.sleepHours)} hr sleep`);
+    }
+    if (typeof latest.walkMinutes === "number") {
+      reasons.push(`${latest.walkMinutes} min movement`);
+    }
+    if (typeof latest.waterGlasses === "number") {
+      reasons.push(`${latest.waterGlasses} glasses hydration`);
+    }
+    return {
+      predictedEnergy: Math.round(latest.energyLevel ?? 0),
+      confidence: "Current check-in",
+      reasons,
+      coldStart: true,
+    };
+  }
 
   const sorted = [...docs].sort((a, b) => new Date(a.date) - new Date(b.date));
   const last14 = sorted.slice(-14);
@@ -452,7 +611,24 @@ const WEEKDAY_FULL = {
 };
 
 export const getWeekOutlook = (docs) => {
-  if (!hasEnoughHistory(docs)) return COLD_START_FALLBACK.weekOutlook;
+  if (!Array.isArray(docs) || !docs.length) {
+    return COLD_START_FALLBACK.weekOutlook;
+  }
+
+  if (!hasEnoughHistory(docs)) {
+    const sorted = [...docs].sort(
+      (a, b) => new Date(a.date) - new Date(b.date),
+    );
+    const latest = sorted[sorted.length - 1];
+    const day = WEEKDAY_NAMES[new Date(latest.date).getDay()];
+    const energy = Math.round(latest.energyLevel ?? 0);
+    return {
+      series: [energy],
+      days: [day],
+      insight: `Current check-in: ${energy}% energy on ${WEEKDAY_FULL[day]}.`,
+      coldStart: true,
+    };
+  }
 
   const byWeekday = {};
   docs.forEach((d) => {
@@ -487,8 +663,48 @@ const RECOMMENDATION_COPY = {
   walk_calm: "Take a short walk to stay calm",
 };
 
-export const getRecommendedForTomorrow = (energyFormula) => {
-  if (!energyFormula || !energyFormula.length) return COLD_START_FALLBACK.recommended;
+const getCurrentRecommendations = (currentDoc) => {
+  if (!currentDoc) return [];
+  const actions = [];
+
+  if (typeof currentDoc.sleepHours === "number") {
+    const sleep = currentDoc.sleepHours;
+    actions.push({
+      label: sleep < 7
+        ? `Add ${formatSelectedNumber(7 - sleep)} hr sleep`
+        : `Keep sleep near ${formatSelectedNumber(sleep)} hr`,
+      predictedImpact: `Today: ${formatSelectedNumber(sleep)} hr`,
+      source: "current_checkin",
+    });
+  }
+
+  if (typeof currentDoc.walkMinutes === "number") {
+    const walk = currentDoc.walkMinutes;
+    actions.push({
+      label: walk < 20
+        ? `Add ${20 - walk} min movement`
+        : `Keep at least ${walk} min movement`,
+      predictedImpact: `Today: ${walk} min`,
+      source: "current_checkin",
+    });
+  }
+
+  if (typeof currentDoc.waterGlasses === "number") {
+    const water = currentDoc.waterGlasses;
+    actions.push({
+      label: `Keep hydration near ${water} glasses`,
+      predictedImpact: `Today: ${water} glasses`,
+      source: "current_checkin",
+    });
+  }
+
+  return actions.slice(0, 2);
+};
+
+export const getRecommendedForTomorrow = (energyFormula, currentDoc = null) => {
+  if (!energyFormula || !energyFormula.length) {
+    return getCurrentRecommendations(currentDoc);
+  }
 
   const positive = energyFormula
     .filter((rule) => rule.liftPercent > 0)
@@ -500,7 +716,7 @@ export const getRecommendedForTomorrow = (energyFormula) => {
     }));
 
   if (positive.length >= 2) return positive;
-  return [...positive, ...COLD_START_FALLBACK.recommended].slice(0, 2);
+  return positive.length ? positive : getCurrentRecommendations(currentDoc);
 };
 
 export const getGoalForecast = (docs, goal) => {

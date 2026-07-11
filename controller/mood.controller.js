@@ -214,7 +214,7 @@ export const getCheck = catchAsync(async (req, res) => {
 
   const history = await Mood.find({
     userId,
-    completedAt: { $ne: null },
+    $or: [{ completedAt: { $ne: null } }, { status: true }],
     _id: { $ne: doc._id },
   }).sort({ date: 1 });
 
