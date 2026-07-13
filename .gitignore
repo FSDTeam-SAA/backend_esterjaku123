@@ -50,6 +50,12 @@ public/uploads/
 # Docker
 docker-compose.override.yml
 
+
+.env
+.env.*
+!.env.example
+
+
 # Misc
 *.pid
 *.seed
