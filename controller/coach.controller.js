@@ -11,6 +11,9 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const HISTORY_WINDOW = 10;
 const NUDGE_THROTTLE_MS = 2 * 60 * 60 * 1000; // 2 hours — guards against a misfiring client idle-timer spamming nudges
+const STREAM_HEARTBEAT_MS = 15 * 1000;
+const DEFAULT_REPLY =
+  "I'm here for you — tell me more about how you're feeling.";
 
 // Single entry today (matches the one proactive-nudge example in the design), kept as an
 // array so more variants can be added later without changing the API shape.
@@ -154,7 +157,7 @@ export const sendCoachMessage = catchAsync(async (req, res) => {
     })),
   ];
 
-  let replyText = "I'm here for you — tell me more about how you're feeling.";
+  let replyText = DEFAULT_REPLY;
   let quickReplies = [];
 
   try {
@@ -184,6 +187,140 @@ export const sendCoachMessage = catchAsync(async (req, res) => {
     data: { userMessage, coachMessage },
   });
 });
+
+const writeStreamEvent = (res, payload) => {
+  if (res.destroyed || res.writableEnded) return;
+  res.write(`data: ${JSON.stringify(payload)}\n\n`);
+};
+
+// Streams the assistant response token-by-token using Server-Sent Events.
+// The completed user/coach pair is persisted with the same shape as the
+// buffered endpoint so chat history remains the source of truth.
+export const streamCoachMessage = async (req, res, next) => {
+  const userId = req.user._id;
+  const text = req.body?.text?.toString().trim();
+
+  if (!text) {
+    return next(
+      new AppError(httpStatus.BAD_REQUEST, "Message text is required"),
+    );
+  }
+  if (text.length > 1000) {
+    return next(new AppError(httpStatus.BAD_REQUEST, "Message is too long"));
+  }
+
+  res.status(httpStatus.OK);
+  res.set({
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.flushHeaders();
+
+  // Confirm the SSE connection before database/OpenAI work starts. Once this
+  // is sent the app will not retry the buffered route and duplicate a message.
+  writeStreamEvent(res, { type: "ready" });
+
+  const heartbeat = setInterval(() => {
+    if (!res.destroyed && !res.writableEnded) res.write(": heartbeat\n\n");
+  }, STREAM_HEARTBEAT_MS);
+
+  const abortController = new AbortController();
+  res.on("close", () => abortController.abort());
+
+  let rawReply = "";
+  let emittedReplyLength = 0;
+  let userMessage;
+
+  const emitAvailableReply = ({ final = false } = {}) => {
+    const marker = "\nSUGGESTIONS:";
+    const markerIndex = rawReply.toUpperCase().indexOf(marker);
+    const safeEnd =
+      markerIndex >= 0
+        ? markerIndex
+        : final
+          ? rawReply.length
+          : Math.max(0, rawReply.length - marker.length);
+
+    if (safeEnd <= emittedReplyLength) return;
+    writeStreamEvent(res, {
+      type: "delta",
+      delta: rawReply.slice(emittedReplyLength, safeEnd),
+    });
+    emittedReplyLength = safeEnd;
+  };
+
+  try {
+    userMessage = await CoachMessage.create({
+      userId,
+      sender: "user",
+      text,
+    });
+
+    const recentHistory = await CoachMessage.find({ userId })
+      .sort({ createdAt: -1 })
+      .limit(HISTORY_WINDOW);
+    const orderedHistory = recentHistory.reverse();
+    const context = await buildContextSummary(userId);
+    const messages = [
+      { role: "system", content: buildSystemPrompt(context) },
+      ...orderedHistory.map((message) => ({
+        role: message.sender === "coach" ? "assistant" : "user",
+        content: message.text,
+      })),
+    ];
+
+    try {
+      const stream = await openai.chat.completions.create(
+        {
+          model: "gpt-3.5-turbo",
+          messages,
+          stream: true,
+        },
+        { signal: abortController.signal },
+      );
+
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta?.content || "";
+        if (!delta) continue;
+        rawReply += delta;
+        // Hold a short tail so the private SUGGESTIONS control line never
+        // flashes inside the visible message bubble.
+        emitAvailableReply();
+      }
+    } catch (error) {
+      // If OpenAI fails before producing content, keep the chat usable with a
+      // supportive fallback. A partial answer is retained when already sent.
+      if (!rawReply.trim()) {
+        rawReply = DEFAULT_REPLY;
+      }
+    }
+
+    emitAvailableReply({ final: true });
+    const parsed = parseQuickReplies(rawReply);
+    const coachMessage = await CoachMessage.create({
+      userId,
+      sender: "coach",
+      text: parsed.text || DEFAULT_REPLY,
+      quickReplies: parsed.quickReplies,
+    });
+
+    writeStreamEvent(res, {
+      type: "done",
+      userMessage,
+      coachMessage,
+    });
+  } catch (error) {
+    writeStreamEvent(res, {
+      type: "error",
+      message: "The coach could not respond right now. Please try again.",
+    });
+  } finally {
+    clearInterval(heartbeat);
+    if (!res.writableEnded) res.end();
+  }
+};
 
 // Frontend-initiated proactive nudge (idle timer), not cron — see plan rationale:
 // only the client knows whether the user is actively mid-session right now.

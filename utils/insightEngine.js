@@ -610,12 +610,17 @@ const WEEKDAY_FULL = {
   Sun: "Sunday",
 };
 
+// The full Mon–Sun outlook curve draws as soon as there are at least this many
+// completed check-ins. Below this we show the single cold-start dot, since a
+// 7-point line built from one entry would be a meaningless flat line.
+export const MIN_ENTRIES_FOR_WEEK_OUTLOOK = 2;
+
 export const getWeekOutlook = (docs) => {
   if (!Array.isArray(docs) || !docs.length) {
     return COLD_START_FALLBACK.weekOutlook;
   }
 
-  if (!hasEnoughHistory(docs)) {
+  if (docs.length < MIN_ENTRIES_FOR_WEEK_OUTLOOK) {
     const sorted = [...docs].sort(
       (a, b) => new Date(a.date) - new Date(b.date),
     );
@@ -640,9 +645,11 @@ export const getWeekOutlook = (docs) => {
 
   const overallAvg = average(docs.slice(-14).map((d) => d.energyLevel)) ?? 65;
 
+  // A single logged day is enough to show that weekday's real value; only days
+  // with no entries at all fall back to the overall average (a soft estimate).
   const series = WEEK_ORDER.map((day) => {
     const values = byWeekday[day];
-    if (values && values.length >= 2) return Math.round(average(values));
+    if (values && values.length >= 1) return Math.round(average(values));
     return Math.round(overallAvg);
   });
 
