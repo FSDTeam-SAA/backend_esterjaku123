@@ -24,7 +24,6 @@ coverage/
 .eslintcache
 
 # IDEs and Editors
-.vscode/
 .idea/
 *.swp
 *.swo
@@ -50,10 +49,6 @@ public/uploads/
 # Docker
 docker-compose.override.yml
 
-
-.env
-.env.*
-!.env.example
 
 
 # Misc
