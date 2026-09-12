@@ -52,9 +52,6 @@ docker-compose.override.yml
 
 
 .env
-.env.*
-!.env.example
-
 
 # Misc
 *.pid
