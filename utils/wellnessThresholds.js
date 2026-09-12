@@ -26,6 +26,9 @@ export const CONTEXT_TAGS = [
   "Hopeful",
   "Overwhelmed",
   "Content",
+  "Routine",
+  "Daylight",
+  "Outdoor",
 ];
 
 export const WIN_CATEGORIES = [

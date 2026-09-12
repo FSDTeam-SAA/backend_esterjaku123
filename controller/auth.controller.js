@@ -15,10 +15,6 @@ const getStoredRefreshTokens = (user) => {
   return [...new Set([...tokens, ...legacyToken].filter(Boolean))];
 };
 
-
-// aaaaaaaaaaa
-
-
 const persistRefreshToken = (user, refreshToken) => {
   const tokens = [...getStoredRefreshTokens(user), refreshToken];
   user.refreshTokens = [...new Set(tokens.filter(Boolean))].slice(
@@ -32,7 +28,7 @@ const hasRefreshToken = (user, refreshToken) => {
 };
 
 export const register = catchAsync(async (req, res) => {
-  const { name, userName, email, password, confirmPassword } = req.body;
+  const { name, userName, email, password, confirmPassword, isAtLeast16 } = req.body;
   const normalizedName = name || userName;
 
   if (!email || !password) {
@@ -44,6 +40,9 @@ export const register = catchAsync(async (req, res) => {
       httpStatus.FORBIDDEN,
       "Password and confirm password do not match"
     );
+  }
+  if (isAtLeast16 !== true) {
+    throw new AppError(httpStatus.FORBIDDEN, "You must be at least 16 years old to use Unfiltered");
   }
   const checkUser = await User.findOne({ email: email });
   if (checkUser)
@@ -241,6 +240,7 @@ export const resetPassword = catchAsync(async (req, res) => {
     throw new AppError(httpStatus.BAD_REQUEST, "Invalid OTP");
   }
   user.password = password;
+  user.password_reset_token = "";
   await user.save();
   sendResponse(res, {
     statusCode: httpStatus.OK,

@@ -74,8 +74,8 @@ export const sendMessageTemplate = ({ email, name, phone, message }) => {
       <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 30px 0;"/>
 
       <footer style="text-align: center; font-size: 13px; color: #9ca3af;">
-        This message was sent via the Quantivo contact form.<br />
-        &copy; 2025 Quantivo. All rights reserved.
+        This message was sent via the Unfiltered contact form.<br />
+        &copy; 2025 Unfiltered. All rights reserved.
       </footer>
     </div>
   `;
@@ -87,7 +87,7 @@ export const sendFeedbackTemplate = ({ email, name, subject, message }) => {
       <header style="padding-bottom: 18px; border-bottom: 1px solid #e5e7eb;">
         <h1 style="margin: 0; color: #111827; font-size: 24px;">New App Feedback</h1>
         <p style="margin: 8px 0 0; color: #6b7280; font-size: 14px;">
-          A user submitted feedback from Honest Health Track.
+          A user submitted feedback from Unfiltered.
         </p>
       </header>
 
@@ -112,7 +112,7 @@ export const inviteLinkTemplate = (inviterName, inviteLink) => {
       <div style="background: linear-gradient(135deg, #4f46e5, #3b82f6); padding: 30px; text-align: center; color: white;">
         <h1 style="margin: 0; font-size: 26px; font-weight: bold;">You're Invited!</h1>
         <p style="margin-top: 6px; font-size: 15px; opacity: 0.9;">
-          ${inviterName} has invited you to join Quantivo
+          ${inviterName} has invited you to join Unfiltered
         </p>
       </div>
 
@@ -139,7 +139,7 @@ export const inviteLinkTemplate = (inviterName, inviteLink) => {
 
       <!-- Footer -->
       <div style="background-color: #f3f4f6; text-align: center; padding: 15px; font-size: 13px; color: #9ca3af;">
-        &copy; 2025 Quantivo. All rights reserved.
+        &copy; 2025 Unfiltered. All rights reserved.
       </div>
     </div>
   `;

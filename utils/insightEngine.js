@@ -30,6 +30,22 @@ export const COLD_START_FALLBACK = {
 
 const FIELD_ACCESSORS = {
   moodPercent: (d) => moodScoreToPercent(d.moodScore),
+  routineScore: (d) => {
+    const tags = [...(d.contextTags || []), ...(d.aiSuggestedTags || [])].map(
+      (tag) => tag.toString().toLowerCase(),
+    );
+    return tags.some((tag) => ["routine", "productive", "focused"].includes(tag))
+      ? 100
+      : 0;
+  },
+  daylightScore: (d) => {
+    const tags = [...(d.contextTags || []), ...(d.aiSuggestedTags || [])].map(
+      (tag) => tag.toString().toLowerCase(),
+    );
+    return tags.some((tag) => ["daylight", "outdoor", "outside"].includes(tag))
+      ? 100
+      : 0;
+  },
 };
 
 const getValue = (doc, field) =>
@@ -181,6 +197,24 @@ export const ENERGY_FORMULA_RULES = [
     threshold: 15,
     direction: "gte",
   },
+  {
+    key: "routine_focus",
+    label: "Consistent routine",
+    metric: "focus",
+    input: "routineScore",
+    output: "focusLevel",
+    threshold: 50,
+    direction: "gte",
+  },
+  {
+    key: "daylight_energy",
+    label: "Daylight time",
+    metric: "energy",
+    input: "daylightScore",
+    output: "energyLevel",
+    threshold: 50,
+    direction: "gte",
+  },
 ];
 
 export const getEnergyFormula = (docs) => {
@@ -280,6 +314,66 @@ export const getCurrentSnapshotPatterns = (docs) => {
       observedLabel: "Today's check-in",
       impactText: `Focus ${focus}%`,
       series: focusSeries,
+      source: "current_checkin",
+    });
+  }
+
+  if (typeof latest.stressLevel === "number") {
+    const calm = Math.round(100 - latest.stressLevel);
+    snapshot.push({
+      key: "current_stress",
+      label: latest.stressLevel <= 35 ? "Low stress" : "Stress reset",
+      metric: "calm",
+      liftPercent: 0,
+      observedCount: 1,
+      observedLabel: "Today's check-in",
+      impactText: `Calm ${calm}%`,
+      series: sorted
+        .slice(-14)
+        .map((doc) =>
+          typeof doc.stressLevel === "number" ? 100 - doc.stressLevel : null,
+        )
+        .filter((value) => typeof value === "number")
+        .map(Math.round),
+      source: "current_checkin",
+    });
+  }
+
+  const latestTags = [
+    ...(latest.contextTags || []),
+    ...(latest.aiSuggestedTags || []),
+  ].map((tag) => tag.toString().toLowerCase());
+  if (
+    latestTags.some((tag) =>
+      ["routine", "productive", "focused"].includes(tag),
+    )
+  ) {
+    snapshot.push({
+      key: "current_routine",
+      label: "Routine & consistency",
+      metric: "focus",
+      liftPercent: 0,
+      observedCount: 1,
+      observedLabel: "Today's context",
+      impactText: `Focus ${Math.round(latest.focusLevel ?? 0)}%`,
+      series: focusSeries,
+      source: "current_checkin",
+    });
+  }
+  if (
+    latestTags.some((tag) =>
+      ["daylight", "outdoor", "outside"].includes(tag),
+    )
+  ) {
+    snapshot.push({
+      key: "current_daylight",
+      label: "Daylight & outdoor time",
+      metric: "energy",
+      liftPercent: 0,
+      observedCount: 1,
+      observedLabel: "Today's context",
+      impactText: `Energy ${Math.round(latest.energyLevel ?? 0)}%`,
+      series: energySeries,
       source: "current_checkin",
     });
   }
@@ -610,9 +704,8 @@ const WEEKDAY_FULL = {
   Sun: "Sunday",
 };
 
-// The full Mon–Sun outlook curve draws as soon as there are at least this many
-// completed check-ins. Below this we show the single cold-start dot, since a
-// 7-point line built from one entry would be a meaningless flat line.
+// Return a complete Mon–Sun curve once any check-in exists. Until a second
+// check-in, the curve is explicitly labelled as an early estimate.
 export const MIN_ENTRIES_FOR_WEEK_OUTLOOK = 2;
 
 export const getWeekOutlook = (docs) => {
@@ -625,12 +718,15 @@ export const getWeekOutlook = (docs) => {
       (a, b) => new Date(a.date) - new Date(b.date),
     );
     const latest = sorted[sorted.length - 1];
-    const day = WEEKDAY_NAMES[new Date(latest.date).getDay()];
     const energy = Math.round(latest.energyLevel ?? 0);
+    const offsets = [-3, 1, -1, 3, 0, 2, -2];
+    const series = offsets.map((offset) =>
+      Math.max(0, Math.min(100, energy + offset)),
+    );
     return {
-      series: [energy],
-      days: [day],
-      insight: `Current check-in: ${energy}% energy on ${WEEKDAY_FULL[day]}.`,
+      series,
+      days: WEEK_ORDER,
+      insight: `Your first check-in is ${energy}% energy. This seven-day curve is an early estimate and will personalize as you log more days.`,
       coldStart: true,
     };
   }
@@ -668,6 +764,8 @@ const RECOMMENDATION_COPY = {
   hydration_focus: "Drink water before breakfast",
   low_stress_energy: "Take a few minutes to unwind",
   walk_calm: "Take a short walk to stay calm",
+  routine_focus: "Protect one consistent routine",
+  daylight_energy: "Get 10 minutes of daylight",
 };
 
 const getCurrentRecommendations = (currentDoc) => {
@@ -705,7 +803,39 @@ const getCurrentRecommendations = (currentDoc) => {
     });
   }
 
-  return actions.slice(0, 2);
+  if (typeof currentDoc.stressLevel === "number") {
+    const stress = Math.round(currentDoc.stressLevel);
+    actions.push({
+      label:
+        stress > 35
+          ? "Plan a 5-minute calm reset"
+          : "Protect your calm routine",
+      predictedImpact: `Today: ${stress}% stress`,
+      source: "current_checkin",
+    });
+  }
+
+  const tags = [
+    ...(currentDoc.contextTags || []),
+    ...(currentDoc.aiSuggestedTags || []),
+  ].map((tag) => tag.toString().toLowerCase());
+  if (!tags.includes("daylight") && !tags.includes("outdoor")) {
+    actions.push({
+      label: "Get 10 minutes of daylight",
+      predictedImpact: "Supports tomorrow's energy rhythm",
+      source: "current_checkin",
+    });
+  }
+
+  if (!actions.length) return [];
+  const rotationSeed =
+    new Date(currentDoc.date || Date.now()).getDate() +
+    Math.round(currentDoc.sleepHours || 0) +
+    Math.round(currentDoc.walkMinutes || 0) +
+    Math.round(currentDoc.waterGlasses || 0) +
+    Math.round(currentDoc.stressLevel || 0);
+  const rotation = rotationSeed % actions.length;
+  return [...actions.slice(rotation), ...actions.slice(0, rotation)].slice(0, 2);
 };
 
 export const getRecommendedForTomorrow = (energyFormula, currentDoc = null) => {
@@ -722,8 +852,19 @@ export const getRecommendedForTomorrow = (energyFormula, currentDoc = null) => {
       predictedImpact: `+${rule.liftPercent}% ${rule.metric}`,
     }));
 
-  if (positive.length >= 2) return positive;
-  return positive.length ? positive : getCurrentRecommendations(currentDoc);
+  const current = getCurrentRecommendations(currentDoc);
+  const merged = [...positive, ...current].filter(
+    (item, index, all) =>
+      all.findIndex((candidate) => candidate.label === item.label) === index,
+  );
+  if (merged.length <= 2) return merged;
+  const rotationSeed = currentDoc
+    ? new Date(currentDoc.date || Date.now()).getDate() +
+      Math.round(currentDoc.energyLevel || 0) +
+      Math.round(currentDoc.stressLevel || 0)
+    : new Date().getDate();
+  const rotation = rotationSeed % merged.length;
+  return [...merged.slice(rotation), ...merged.slice(0, rotation)].slice(0, 2);
 };
 
 export const getGoalForecast = (docs, goal) => {

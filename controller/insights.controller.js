@@ -20,7 +20,7 @@ import {
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
-const insightsModel = process.env.OPENAI_INSIGHTS_MODEL || "gpt-5.4-mini";
+const insightsModel = process.env.OPENAI_INSIGHTS_MODEL || "gpt-4o-mini";
 
 const addAiOutlookInsight = async (outlook, docs) => {
   const fallback = {
@@ -50,14 +50,14 @@ const addAiOutlookInsight = async (outlook, docs) => {
         {
           role: "system",
           content:
-            "You write concise wellness insights from user-provided tracking data. Use only the supplied numbers. Do not diagnose, make medical claims, or invent trends. Return one supportive sentence under 28 words.",
+            "You write useful wellness insights from user-provided tracking data. Use only supplied numbers and clearly distinguish estimates. Give one observation and one practical next step in no more than two sentences and 55 words. Do not diagnose or make medical claims.",
         },
         {
           role: "user",
           content: `Create the insight from this JSON: ${JSON.stringify(metrics)}`,
         },
       ],
-      max_output_tokens: 80,
+      max_output_tokens: 140,
     });
     const insight = response.output_text?.trim();
     if (!insight) return fallback;
@@ -99,14 +99,14 @@ const addAiSleepEnergyInsight = async (chart, docs) => {
         {
           role: "system",
           content:
-            "You write concise sleep-and-energy wellness insights from tracking data. Use only supplied numbers. With one point, describe it without claiming a trend. Do not diagnose or make medical claims. Return one sentence under 28 words.",
+            "You write useful sleep-and-energy wellness insights from tracking data. Use only supplied numbers. With one point, describe it without claiming a trend. Give one observation and one practical next step in no more than two sentences and 55 words. Do not diagnose or make medical claims.",
         },
         {
           role: "user",
           content: `Create the sleep-and-energy insight from this JSON: ${JSON.stringify(metrics)}`,
         },
       ],
-      max_output_tokens: 80,
+      max_output_tokens: 140,
     });
     const insight = response.output_text?.trim();
     if (!insight) return fallback;

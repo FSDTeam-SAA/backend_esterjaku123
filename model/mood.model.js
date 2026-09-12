@@ -14,7 +14,14 @@ const moodSchema = new mongoose.Schema(
     moodScore: { type: Number, enum: MOOD_SCORES },
     moodLabel: {
       type: String,
-      enum: ["Terrible", "Poor", "Okay", "Good", "Amazing"],
+      enum: [
+        "Terrible", "Poor", "Okay", "Good", "Amazing", "Tired",
+        "Happy", "Romantic", "Excited", "Weird", "Hopeful", "Sleepy",
+        "Stressed", "Angry", "Neutral", "Sad", "Relaxed", "Motivated",
+        "Creative", "Thoughtful", "Reflective", "Dreamy", "Nostalgic",
+        "Emotional", "Anxious", "Confused", "Frustrated", "Silly",
+        "Curious", "Adventurous",
+      ],
     },
     energyLevel: { type: Number, min: 0, max: 100 },
     calmLevel: { type: Number, min: 0, max: 100 },

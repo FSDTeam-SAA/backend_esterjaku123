@@ -9,6 +9,8 @@ import coachRoute from "../route/coach.route.js";
 import goalRoute from "../route/goal.route.js";
 import homeRoute from "../route/home.route.js";
 import insightsRoute from "../route/insights.route.js";
+import feedbackRoute from "../route/feedback.route.js";
+import meditationRoute from "../route/meditation.route.js";
 
 const router = express.Router();
 
@@ -22,5 +24,8 @@ router.use("/coach", coachRoute);
 router.use("/goals", goalRoute);
 router.use("/home", homeRoute);
 router.use("/insights", insightsRoute);
+router.use("/feedback", feedbackRoute);
+router.use("/meditation", meditationRoute);
+
 
 export default router;

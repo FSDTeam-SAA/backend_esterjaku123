@@ -8,12 +8,59 @@ import sendResponse from "../utils/sendResponse.js";
 import catchAsync from "../utils/catchAsync.js";
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const COACH_MODEL = process.env.OPENAI_COACH_MODEL || "gpt-4o-mini";
 
 const HISTORY_WINDOW = 10;
 const NUDGE_THROTTLE_MS = 2 * 60 * 60 * 1000; // 2 hours — guards against a misfiring client idle-timer spamming nudges
 const STREAM_HEARTBEAT_MS = 15 * 1000;
 const DEFAULT_REPLY =
   "I'm here for you — tell me more about how you're feeling.";
+
+const FALLBACK_REPLIES = {
+  unwell: [
+    "I'm sorry you're feeling unwell. Rest, sip fluids, and consider checking your temperature. If symptoms are severe or getting worse, contact a healthcare professional.",
+    "Feeling ill can drain you. Keep things gentle, hydrate, and seek medical advice if the fever is high, persistent, or comes with worrying symptoms.",
+  ],
+  tired: [
+    "That sounds exhausting. If you can, take a short screen break, drink some water, and choose one small task for the rest of today.",
+    "Your body may be asking for a slower pace. Would a ten-minute rest or an earlier bedtime feel more realistic today?",
+  ],
+  stress: [
+    "That sounds like a lot to carry. Try one slow breath out longer than in, then name the single thing creating the most pressure.",
+    "Let's make this smaller together. What is one part you can pause, delegate, or finish in ten minutes?",
+  ],
+  lowMood: [
+    "I'm glad you said it out loud. You don't need to fix everything now—would connection, quiet, or one tiny completed task help most?",
+    "That sounds painful. Be gentle with yourself today, and consider reaching out to someone you trust so you don't have to hold it alone.",
+  ],
+  positive: [
+    "That's good to hear. What helped create that feeling today, and how could you make a little room for it again tomorrow?",
+    "Let's protect that momentum. Name one choice from today that you would genuinely like to repeat.",
+  ],
+  general: [
+    "I'm listening. What happened just before you started feeling this way?",
+    "Thank you for checking in. Would you like to unpack the feeling, make a small plan, or simply have a calm moment?",
+    "We can take this one step at a time. What would feel most supportive right now?",
+  ],
+};
+
+const getFallbackCategory = (text) => {
+  const value = text.toLowerCase();
+  if (/fever|unwell|sick|ill|pain|temperature/.test(value)) return "unwell";
+  if (/tired|sleep|exhaust|fatigue|drained|break/.test(value)) return "tired";
+  if (/stress|anxious|anxiety|overwhelm|pressure|panic/.test(value)) return "stress";
+  if (/sad|down|lonely|hopeless|cry|upset/.test(value)) return "lowMood";
+  if (/happy|good|great|better|excited|proud/.test(value)) return "positive";
+  return "general";
+};
+
+export const buildContextualFallback = (text, recentCoachTexts = []) => {
+  const replies = FALLBACK_REPLIES[getFallbackCategory(text)] || FALLBACK_REPLIES.general;
+  const normalizedRecent = new Set(
+    recentCoachTexts.map((item) => item?.toString().trim()).filter(Boolean),
+  );
+  return replies.find((reply) => !normalizedRecent.has(reply)) || replies[0] || DEFAULT_REPLY;
+};
 
 // Single entry today (matches the one proactive-nudge example in the design), kept as an
 // array so more variants can be added later without changing the API shape.
@@ -70,7 +117,7 @@ const buildContextSummary = async (userId) => {
 };
 
 const buildSystemPrompt = ({ moodSummary, journalSummary }) =>
-  `You are Ester's supportive wellness coach inside a mood-tracking app. Be warm, brief (under 60 words), practical, and never give medical advice. Use the context below to personalize your reply when relevant, but do not recite raw numbers back robotically.
+  `You are Unfiltered's supportive wellness coach inside a mood-tracking app. Be warm, brief (under 60 words), practical, and never give medical advice. Use the context below to personalize your reply when relevant, but do not recite raw numbers back robotically.
 
 Recent mood summary (last 7 days): ${moodSummary}
 Recent journal themes: ${journalSummary}
@@ -157,12 +204,18 @@ export const sendCoachMessage = catchAsync(async (req, res) => {
     })),
   ];
 
-  let replyText = DEFAULT_REPLY;
+  const fallbackReply = buildContextualFallback(
+    text.toString(),
+    orderedHistory
+      .filter((message) => message.sender === "coach")
+      .map((message) => message.text),
+  );
+  let replyText = fallbackReply;
   let quickReplies = [];
 
   try {
     const response = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
+      model: COACH_MODEL,
       messages,
     });
     const raw = response.choices[0]?.message?.content || replyText;
@@ -170,7 +223,10 @@ export const sendCoachMessage = catchAsync(async (req, res) => {
     replyText = parsed.text || replyText;
     quickReplies = parsed.quickReplies;
   } catch (error) {
-    // Fall back to the default supportive reply above instead of failing the request.
+    console.error(
+      "OpenAI coach generation failed; using contextual fallback:",
+      error?.status || error?.code || error?.message || "unknown error",
+    );
   }
 
   const coachMessage = await CoachMessage.create({
@@ -262,6 +318,12 @@ export const streamCoachMessage = async (req, res, next) => {
       .sort({ createdAt: -1 })
       .limit(HISTORY_WINDOW);
     const orderedHistory = recentHistory.reverse();
+    const fallbackReply = buildContextualFallback(
+      text,
+      orderedHistory
+        .filter((message) => message.sender === "coach")
+        .map((message) => message.text),
+    );
     const context = await buildContextSummary(userId);
     const messages = [
       { role: "system", content: buildSystemPrompt(context) },
@@ -274,7 +336,7 @@ export const streamCoachMessage = async (req, res, next) => {
     try {
       const stream = await openai.chat.completions.create(
         {
-          model: "gpt-3.5-turbo",
+          model: COACH_MODEL,
           messages,
           stream: true,
         },
@@ -293,8 +355,12 @@ export const streamCoachMessage = async (req, res, next) => {
       // If OpenAI fails before producing content, keep the chat usable with a
       // supportive fallback. A partial answer is retained when already sent.
       if (!rawReply.trim()) {
-        rawReply = DEFAULT_REPLY;
+        rawReply = fallbackReply;
       }
+      console.error(
+        "OpenAI coach stream failed; using contextual fallback:",
+        error?.status || error?.code || error?.message || "unknown error",
+      );
     }
 
     emitAvailableReply({ final: true });
@@ -302,7 +368,7 @@ export const streamCoachMessage = async (req, res, next) => {
     const coachMessage = await CoachMessage.create({
       userId,
       sender: "coach",
-      text: parsed.text || DEFAULT_REPLY,
+      text: parsed.text || fallbackReply,
       quickReplies: parsed.quickReplies,
     });
 
