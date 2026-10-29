@@ -54,8 +54,4 @@ docker-compose.override.yml
 # Misc
 *.pid
 *.seed
-*.pid.lock
 config.bat
-branch_structure.json
-temp_auto_push.bat
-temp_interactive_push.bat
