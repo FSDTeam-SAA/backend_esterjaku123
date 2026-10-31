@@ -1,6 +1,5 @@
 # Dependencies
 node_modules/
-.env
 
 # Logs
 logs/
@@ -48,3 +47,4 @@ public/uploads/
 
 # Docker
 docker-compose.override.yml
+config.bat
