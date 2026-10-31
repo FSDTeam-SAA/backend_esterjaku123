@@ -48,10 +48,3 @@ public/uploads/
 
 # Docker
 docker-compose.override.yml
-
-
-
-# Misc
-*.pid
-*.seed
-config.bat
